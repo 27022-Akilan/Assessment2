@@ -9,6 +9,11 @@ namespace BoilerApplication
     /// </summary>
     public class Program
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
         static async Task Main(string[] args)
         {
             try
@@ -18,7 +23,7 @@ namespace BoilerApplication
                 ILogger logger = new Logger("BoilerLog.csv");
                 Boiler boiler = new Boiler();
 
-                Service service = new Service(boiler, logger);
+                BoilerService service = new BoilerService(boiler, logger);
 
                 await logger.LoadFromFile();
                 service.ResetBoiler();
@@ -26,7 +31,7 @@ namespace BoilerApplication
                 await logger.AppendLog(DateTime.Now, "Inter Lock Status Change", "Reseted to Open state");
 
 
-                BiolerView view = new BiolerView(service, boiler, logger);
+                BoilerView view = new BoilerView(service, boiler, logger);
                 await view.RunApplication();
             }
 

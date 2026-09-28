@@ -5,14 +5,14 @@ using BoilerApplication.Repository;
 
 namespace BoilerApplication.Services
 {
-    public class Service
+    public class BoilerService
     {
         private Boiler _boiler;
 
         private ILogger _logger;
 
         private CancellationTokenSource _cts = default;
-        public Service(Boiler boiler, ILogger logger)
+        public BoilerService(Boiler boiler, ILogger logger)
         {
             _logger = logger;
             _boiler = boiler;
@@ -23,7 +23,7 @@ namespace BoilerApplication.Services
         {
             if (_boiler.GetInterLockState() == InterLockState.Open)
             {
-                return "Boiler is open please close then start the boiler";
+                return "Boiler is open, please close the boiler inter lock then start the boiler";
             }
 
             if (_boiler.GetBoilerState() == BoilerState.Ready && _boiler.GetInterLockState() == InterLockState.Close)
@@ -86,9 +86,12 @@ namespace BoilerApplication.Services
             BoilerState currentBoilerState = _boiler.GetBoilerState();
             if (currentBoilerState == BoilerState.Lockout)
             {
-                return "The boiler itself is in the stop state";
+                return "The boiler is in the Initial state only. \nSo Can't stop it.";
             }
-
+            if (currentBoilerState == BoilerState.Ready)
+            {
+                return "THe boiler is already in the Ready state hence cant be stopped";
+            }
             if (currentBoilerState == BoilerState.PrePurge || currentBoilerState == BoilerState.Ignition)
             {
                 _cts.Cancel();
@@ -141,6 +144,7 @@ namespace BoilerApplication.Services
             }
 
             // To Handle inbetween cases inginition and pre - purge
+            ResetBoiler();
             await _logger.AppendLog(DateTime.Now, "Inter Lock State change", $"Changed to : {currentInterLockState}");
             return $"Status Chnaged to {currentInterLockState}";
         }

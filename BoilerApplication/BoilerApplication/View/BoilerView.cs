@@ -6,9 +6,9 @@ using BoilerApplication.Services;
 
 namespace BoilerApplication.View
 {
-    public class BiolerView
+    public class BoilerView
     {
-        private Service _boilerService;
+        private BoilerService _boilerService;
 
         private Boiler _boiler;
 
@@ -16,40 +16,12 @@ namespace BoilerApplication.View
 
         private static object _UILock = new object();
 
-        public BiolerView(Service boilerService, Boiler boiler, ILogger logger)
+        public BoilerView(BoilerService boilerService, Boiler boiler, ILogger logger)
         {
             _boilerService = boilerService;
             _boiler = boiler;
             _logger = logger;
             _boilerService.ReflectTime += DisplayDashBoard;
-        }
-
-        private void DisplayDashBoard(string timeLeft, BoilerState state)
-        {
-            CleanDashBoard();
-            if (!Monitor.TryEnter(_UILock))
-            {
-                return;
-            }
-            try
-            {
-                (int left, int right) = Console.GetCursorPosition();
-                Console.SetCursorPosition(0, 0);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.BackgroundColor = ConsoleColor.Black;
-                Console.WriteLine($"State : {state} | Time left out  : {timeLeft}");
-                Console.ResetColor();
-                Console.SetCursorPosition(left, right);
-            }
-            finally
-            {
-                Monitor.Exit(_UILock);
-            }
-        }
-
-        private void CleanDashBoard()
-        {
-            Console.WriteLine();
         }
 
         public async Task RunApplication()
@@ -96,10 +68,10 @@ namespace BoilerApplication.View
                             break;
                     }
 
-                    DisplayMessage(result);
+                    DisplayMessage($"\n{result}\n");
                     DisplayStateMessage($"After your operation" +
                          $"\nBoiler State: {_boiler.GetBoilerState()}" +
-                         $"\nIl state {_boiler.GetInterLockState()}");
+                         $"\nInter Lock State : {_boiler.GetInterLockState()}");
 
 
                 }
@@ -131,6 +103,34 @@ namespace BoilerApplication.View
                            "\n7.Exit");
         }
 
+
+        private void DisplayDashBoard(string timeLeft, BoilerState state)
+        {
+            CleanDashBoard();
+            if (!Monitor.TryEnter(_UILock))
+            {
+                return;
+            }
+            try
+            {
+                (int left, int right) = Console.GetCursorPosition();
+                Console.SetCursorPosition(0, 0);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.BackgroundColor = ConsoleColor.Black;
+                Console.WriteLine($"State : {state} | Time left out  : {timeLeft}");
+                Console.ResetColor();
+                Console.SetCursorPosition(left, right);
+            }
+            finally
+            {
+                Monitor.Exit(_UILock);
+            }
+        }
+
+        private void CleanDashBoard()
+        {
+            Console.WriteLine();
+        }
         public static void DashBoardMessage(string message)
         {
             Console.ForegroundColor = ConsoleColor.Green;

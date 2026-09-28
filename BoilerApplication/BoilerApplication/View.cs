@@ -8,11 +8,42 @@ namespace BoilerApplication
     {
         private Service _boilerService;
 
+        private static object _UILock = new object();
+
         private Boiler _boiler;
         public View(Service boilerService, Boiler boiler)
         {
             this._boilerService = boilerService;
             _boiler = boiler;
+            _boilerService.ReflectTime += DisplayDashBoard;
+        }
+
+        private void DisplayDashBoard(DateTime time, BoilerState state)
+        {
+            CleanDashBoard();
+            if (!Monitor.TryEnter(_UILock))
+            {
+                return;
+            }
+            try
+            {
+                (int left, int right) = Console.GetCursorPosition();
+                Console.SetCursorPosition(0, 0);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.BackgroundColor = ConsoleColor.Black;
+                Console.WriteLine($"State : {state} | Time left out  : {time}");
+                Console.ResetColor();
+                Console.SetCursorPosition(left, right);
+            }
+            finally
+            {
+                Monitor.Exit(_UILock);
+            }
+        }
+
+        private void CleanDashBoard()
+        {
+            Console.WriteLine();
         }
 
         public async Task RunApplication()
@@ -31,7 +62,7 @@ namespace BoilerApplication
                 try
                 {
 
-                    ConsolePresenter.DisplayMessage($"Last Status" +
+                    DisplayMessage($"Last Status" +
                         $"\nBoiler State: {_boiler.GetBoilerState()}" +
                         $"\nIl state {_boiler.GetInterLockState()}");
 
@@ -54,15 +85,15 @@ namespace BoilerApplication
                             break;
                         case MenuOptions.Exit:
                             isRunning = false;
-                            Console.WriteLine("Exiting the application");
+                            DisplayMessage("Exiting the application");
                             break;
                         default:
-                            Console.WriteLine("Enter the correct choice");
+                            DisplayMessage("Enter the correct choice");
                             break;
                     }
 
-                    Console.WriteLine(result);
-                    ConsolePresenter.DisplayMessage($"After your operation" +
+                    DisplayMessage(result);
+                    DisplayMessage($"After your operation" +
                          $"\nBoiler State: {_boiler.GetBoilerState()}" +
                          $"\nIl state {_boiler.GetInterLockState()}");
 
@@ -71,7 +102,7 @@ namespace BoilerApplication
 
                 catch (InvalidOperationException ex)
                 {
-                    Console.WriteLine("Machine failed Resetting to the normal state !!");
+                    DisplayMessage("Machine failed Resetting to the normal state !!");
                     _boilerService.ResetBoiler();
                 }
 
@@ -80,13 +111,25 @@ namespace BoilerApplication
 
         private void DisplayMenu()
         {
-            Console.Write("\n1.Start" +
+            DisplayMessage("\n1.Start" +
                            "\n2.Stop" +
                            "\n3.SimulateError" +
                            "\n4.Toggle" +
                            "\n5.Reset" +
                            "\n6.View Log" +
                            "\n7.Exit");
+        }
+
+        public static void DisplaySuccessMessage(string s)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine(s);
+            Console.ResetColor();
+        }
+
+        private static void DisplayMessage(string s)
+        {
+            Console.WriteLine(s);
         }
     }
 }

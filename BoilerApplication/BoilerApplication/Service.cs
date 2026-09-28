@@ -17,7 +17,7 @@ namespace BoilerApplication
             this._boiler = boiler;
         }
 
-
+        public event Action<DateTime, BoilerState> ReflectTime;
         public async Task<string> Start()
         {
             if (_boiler.GetInterLockState() == InterLockState.Open)
@@ -28,30 +28,43 @@ namespace BoilerApplication
             if (_boiler.GetBoilerState() == BoilerState.Ready && _boiler.GetInterLockState() == InterLockState.Close)
             {
                 _cts = new CancellationTokenSource();
-                _ = Task.Run(() => StartSequence(_cts.Token));
+                _ = Task.Run(() => StartSequence(10, _cts.Token));
                 return "Boiler stated its processing";
             }
             return "Boiler is already running";
         }
 
-        private async Task StartSequence(CancellationToken ct)
+        private async Task StartSequence(int time, CancellationToken ct)
         {
             try
             {
                 _boiler.ChangeState(BoilerState.PrePurge);
-                Console.WriteLine($"Task Started and in Pre gauge in the state {_boiler.GetBoilerState()} : {DateTime.Now}");
-                await Task.Delay(5000, ct);
+
+                for (int i = time; i > 0; i--)
+                {
+                    ReflectTime?.Invoke(DateTime.Now, _boiler.GetBoilerState());
+                    await Task.Delay(1000, ct);
+                }
+
                 _boiler.ChangeState(BoilerState.Ignition);
-                Console.WriteLine($"Pre gauge completed and in {_boiler.GetBoilerState()} : {DateTime.Now}");
+                for (int i = time; i > 0; i--)
+                {
+                    ReflectTime?.Invoke(DateTime.Now, _boiler.GetBoilerState());
+                    await Task.Delay(1000, ct);
+                }
+
                 _boiler.ChangeState(BoilerState.OperationalState);
-                await Task.Delay(5000, ct);
-                Console.WriteLine($"Went into {_boiler.GetBoilerState()}  :  {DateTime.Now}");
+
             }
 
             catch (OperationCanceledException)
             {
                 _cts.Dispose();
                 _boiler.ChangeState(BoilerState.Lockout);
+                if (_boiler.GetInterLockState() == InterLockState.Close)
+                {
+                    _boiler.ToggleInterLockState();
+                }
             }
         }
 
@@ -97,8 +110,8 @@ namespace BoilerApplication
             // If its Ready and changed to open then its lock out state.
             if (currentBoilerState == BoilerState.Ready && currentInterLockState == InterLockState.Open)
             {
-                return "Changed to open state";
-                // _boiler.ChangeState(BoilerState.Lockout);
+                _boiler.ChangeState(BoilerState.Lockout);
+                return "Changed InterLock state to open state and so Boiler state went into LockOut ";
             }
 
             // If its in operationalState and Open then gets into LockOut state
@@ -123,9 +136,13 @@ namespace BoilerApplication
             if (currentBoilerState == BoilerState.PrePurge || currentBoilerState == BoilerState.Ignition)
             {
                 _cts.Cancel();
+                return "Reseted Boiler Intial State";
             }
-            _boiler.ChangeState(BoilerState.Lockout);
-            return "Reseted Boiler State";
+            else
+            {
+                return "";
+            }
+
         }
     }
 }

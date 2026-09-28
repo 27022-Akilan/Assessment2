@@ -1,21 +1,48 @@
 ﻿using BoilerApplication.Models;
 using BoilerApplication.Repository;
-
+using BoilerApplication.Services;
+using BoilerApplication.View;
 namespace BoilerApplication
 {
-    internal class Program
+    /// <summary>
+    /// Represents the entry point of the application,
+    /// </summary>
+    public class Program
     {
-        static void Main(string[] args)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
+        static async Task Main(string[] args)
         {
-            Console.WriteLine("Hello, World!");
+            try
+            {
+                Console.WriteLine("=============== Boiler Control Initialized ===============");
 
-            ILogger logger = new Logger("BoilerLog.txt");
-            Boiler boiler = new Boiler();
+                ILogger logger = new Logger("BoilerLog.csv");
+                Boiler boiler = new Boiler();
 
-            Service service = new Service(boiler, logger);
+                BoilerService service = new BoilerService(boiler, logger);
 
-            View view = new View(service, boiler);
-            view.RunApplication();
+                await logger.LoadFromFileAsync();
+                service.ResetBoiler();
+                await logger.AppendLogAsync(DateTime.Now, "Status change", "Reseted to LockOut State");
+                await logger.AppendLogAsync(DateTime.Now, "Inter Lock Status Change", "Reseted to Open state");
+
+
+                BoilerView view = new BoilerView(service, boiler, logger);
+                await view.RunApplicationAsync();
+            }
+
+            catch (UnauthorizedAccessException e)
+            {
+                Console.WriteLine("Unathorized access to the file occured closing the file " + e);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Something went wrong " + e);
+            }
         }
     }
 }

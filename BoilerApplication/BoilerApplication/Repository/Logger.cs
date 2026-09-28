@@ -10,7 +10,7 @@
             _filePath = filePath;
         }
 
-        public async Task AppendLog(DateTime dateTime, string activity, string message)
+        public async Task AppendLog(DateTime timeStamp, string activity, string message)
         {
             await _fileLock.WaitAsync();
 
@@ -19,12 +19,12 @@
                 if (!File.Exists(_filePath))
                 {
                     using StreamWriter initialWriter = new StreamWriter(_filePath);
-                    initialWriter.WriteLine("TimeStamp", "Activity", "Log Message");
+                    initialWriter.WriteLine("TimeStamp", "Event", "Event Data");
                     return;
                 }
 
                 using StreamWriter writer = new StreamWriter(_filePath, append: true);
-                writer.WriteLine($"{dateTime},{activity},{message}");
+                writer.WriteLine($"{timeStamp},{activity},{message}");
             }
             finally
             {

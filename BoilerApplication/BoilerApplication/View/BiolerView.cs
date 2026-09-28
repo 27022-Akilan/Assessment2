@@ -1,20 +1,26 @@
 ﻿using BoilerApplication.IOHelper;
 using BoilerApplication.Models;
 using BoilerApplication.Models.Enums;
+using BoilerApplication.Repository;
+using BoilerApplication.Services;
 
-namespace BoilerApplication
+namespace BoilerApplication.View
 {
-    public class View
+    public class BiolerView
     {
         private Service _boilerService;
 
+        private Boiler _boiler;
+
+        private ILogger _logger;
+
         private static object _UILock = new object();
 
-        private Boiler _boiler;
-        public View(Service boilerService, Boiler boiler)
+        public BiolerView(Service boilerService, Boiler boiler, ILogger logger)
         {
-            this._boilerService = boilerService;
+            _boilerService = boilerService;
             _boiler = boiler;
+            _logger = logger;
             _boilerService.ReflectTime += DisplayDashBoard;
         }
 
@@ -52,7 +58,7 @@ namespace BoilerApplication
             while (isRunning)
             {
                 DisplayMenu();
-                bool getOption = InputReader.GetInput<MenuOptions>("\nEnter the option : ",
+                bool getOption = InputReader.GetInput("\nEnter the option : ",
                                                         Validator.GetEnumOption<MenuOptions>,
                                                         out MenuOptions option);
 
@@ -61,11 +67,6 @@ namespace BoilerApplication
                 string result = "";
                 try
                 {
-
-                    DisplayMessage($"Last Status" +
-                        $"\nBoiler State: {_boiler.GetBoilerState()}" +
-                        $"\nIl state {_boiler.GetInterLockState()}");
-
                     switch (option)
                     {
                         case MenuOptions.Start:
@@ -96,7 +97,7 @@ namespace BoilerApplication
                     }
 
                     DisplayMessage(result);
-                    DisplayMessage($"After your operation" +
+                    DisplayStateMessage($"After your operation" +
                          $"\nBoiler State: {_boiler.GetBoilerState()}" +
                          $"\nIl state {_boiler.GetInterLockState()}");
 
@@ -107,11 +108,14 @@ namespace BoilerApplication
                 {
                     DisplayMessage("Machine failed Resetting to the normal state !!");
                     _boilerService.ResetBoiler();
+                    await _logger.AppendLog(DateTime.Now, "[Error]", $"{ex}");
                 }
 
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    DisplayMessage($"Unexpected Error : {e.Message}");
+                    DisplayMessage($"Unexpected Error : {ex.Message}");
+                    _boilerService.ResetBoiler();
+                    await _logger.AppendLog(DateTime.Now, "[Error]", $"{ex}");
                 }
             }
         }
@@ -121,22 +125,32 @@ namespace BoilerApplication
             DisplayMessage("\n1.Start" +
                            "\n2.Stop" +
                            "\n3.SimulateError" +
-                           "\n4.Toggle" +
+                           "\n4.Toggle(open/close)" +
                            "\n5.Reset" +
                            "\n6.View Log" +
                            "\n7.Exit");
         }
 
-        public static void DisplaySuccessMessage(string s)
+        public static void DashBoardMessage(string message)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine(s);
+            DisplayMessage(message);
             Console.ResetColor();
         }
 
-        private static void DisplayMessage(string s)
+        public static void DisplayStateMessage(string stateMessage)
         {
-            Console.WriteLine(s);
+            Console.ForegroundColor = ConsoleColor.Blue;
+            DisplayMessage(stateMessage);
+            Console.ResetColor();
+        }
+
+        private static void DisplayMessage(string message)
+        {
+            lock (_UILock)
+            {
+                Console.WriteLine(message);
+            }
         }
 
         private async Task DisplayLog()

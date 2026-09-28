@@ -1,8 +1,9 @@
-﻿using BoilerApplication.Models;
+﻿using BoilerApplication.ConstantData;
+using BoilerApplication.Models;
 using BoilerApplication.Models.Enums;
 using BoilerApplication.Repository;
 
-namespace BoilerApplication
+namespace BoilerApplication.Services
 {
     public class Service
     {
@@ -10,11 +11,11 @@ namespace BoilerApplication
 
         private ILogger _logger;
 
-        private CancellationTokenSource _cts = null;
+        private CancellationTokenSource _cts = default;
         public Service(Boiler boiler, ILogger logger)
         {
             _logger = logger;
-            this._boiler = boiler;
+            _boiler = boiler;
         }
 
         public event Action<string, BoilerState> ReflectTime;
@@ -28,31 +29,37 @@ namespace BoilerApplication
             if (_boiler.GetBoilerState() == BoilerState.Ready && _boiler.GetInterLockState() == InterLockState.Close)
             {
                 _cts = new CancellationTokenSource();
-                _ = Task.Run(() => StartSequence(10, _cts.Token));
+
+                // Knowingly didnt awaited here backend processing. 
+                _ = Task.Run(() => StartSequence(_cts.Token));
                 return "Boiler stated its processing";
             }
 
             return "Boiler is already running";
         }
 
-        private async Task StartSequence(int time, CancellationToken ct)
+        private async Task StartSequence(CancellationToken ct)
         {
             try
             {
                 _boiler.ChangeState(BoilerState.PrePurge);
                 await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.PrePurge}");
-                for (int i = time; i > 0; i--)
+                for (int i = Constants.TimeForPrePurge; i >= 0; i--)
                 {
                     ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
+
+                    // delaying for 1 second so totaly it makes 10 seconds
                     await Task.Delay(1000, ct);
                 }
 
                 _boiler.ChangeState(BoilerState.Ignition);
                 await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ignition}");
 
-                for (int i = time; i > 0; i--)
+                for (int i = Constants.TimeForIngnition; i >= 0; i--)
                 {
                     ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
+
+                    // delaying for 1 second so totaly it makes 10 seconds
                     await Task.Delay(1000, ct);
                 }
 

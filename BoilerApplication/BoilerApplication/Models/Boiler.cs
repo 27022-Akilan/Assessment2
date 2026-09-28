@@ -5,9 +5,10 @@ namespace BoilerApplication.Models
     public class Boiler
     {
         private static object _stateLock = new object();
-        public BoilerState BoilerState { get; private set; } = BoilerState.Lockout;
 
-        public InterLockState InterLockState { get; private set; } = InterLockState.Open;
+        private BoilerState BoilerState = BoilerState.Lockout;
+
+        private InterLockState InterLockState = InterLockState.Open;
 
 
         public void ChangeState(BoilerState boilerState)

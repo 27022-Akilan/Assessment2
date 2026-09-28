@@ -1,15 +1,19 @@
 ﻿using BoilerApplication.Models;
 using BoilerApplication.Repository;
-
+using BoilerApplication.Services;
+using BoilerApplication.View;
 namespace BoilerApplication
 {
-    internal class Program
+    /// <summary>
+    /// Represents the entry point of the application,
+    /// </summary>
+    public class Program
     {
         static async Task Main(string[] args)
         {
             try
             {
-                Console.WriteLine("Hello, World!");
+                Console.WriteLine("=============== Boiler Control Initialized ===============");
 
                 ILogger logger = new Logger("BoilerLog.csv");
                 Boiler boiler = new Boiler();
@@ -22,7 +26,7 @@ namespace BoilerApplication
                 await logger.AppendLog(DateTime.Now, "Inter Lock Status Change", "Reseted to Open state");
 
 
-                View view = new View(service, boiler);
+                BiolerView view = new BiolerView(service, boiler, logger);
                 await view.RunApplication();
             }
 

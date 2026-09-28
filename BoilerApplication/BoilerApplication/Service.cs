@@ -17,7 +17,7 @@ namespace BoilerApplication
             this._boiler = boiler;
         }
 
-        public event Action<DateTime, BoilerState> ReflectTime;
+        public event Action<string, BoilerState> ReflectTime;
         public async Task<string> Start()
         {
             if (_boiler.GetInterLockState() == InterLockState.Open)
@@ -31,6 +31,7 @@ namespace BoilerApplication
                 _ = Task.Run(() => StartSequence(10, _cts.Token));
                 return "Boiler stated its processing";
             }
+
             return "Boiler is already running";
         }
 
@@ -39,21 +40,24 @@ namespace BoilerApplication
             try
             {
                 _boiler.ChangeState(BoilerState.PrePurge);
-
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.PrePurge}");
                 for (int i = time; i > 0; i--)
                 {
-                    ReflectTime?.Invoke(DateTime.Now, _boiler.GetBoilerState());
+                    ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
                     await Task.Delay(1000, ct);
                 }
 
                 _boiler.ChangeState(BoilerState.Ignition);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ignition}");
+
                 for (int i = time; i > 0; i--)
                 {
-                    ReflectTime?.Invoke(DateTime.Now, _boiler.GetBoilerState());
+                    ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
                     await Task.Delay(1000, ct);
                 }
 
                 _boiler.ChangeState(BoilerState.OperationalState);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.OperationalState}");
 
             }
 
@@ -61,14 +65,16 @@ namespace BoilerApplication
             {
                 _cts.Dispose();
                 _boiler.ChangeState(BoilerState.Lockout);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 if (_boiler.GetInterLockState() == InterLockState.Close)
                 {
                     _boiler.ToggleInterLockState();
+                    await _logger.AppendLog(DateTime.Now, "InterLock change", $"Boiler Interlock changed to : {_boiler.GetInterLockState}");
                 }
             }
         }
 
-        public string Stop()
+        public async Task<string> Stop()
         {
             BoilerState currentBoilerState = _boiler.GetBoilerState();
             if (currentBoilerState == BoilerState.Lockout)
@@ -80,12 +86,14 @@ namespace BoilerApplication
             {
                 _cts.Cancel();
                 _boiler.ChangeState(BoilerState.Lockout);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Stopped the boiler and state changed to : {BoilerState.Lockout}");
                 return $"Stopped Boiler and changed {currentBoilerState} into lockout State";
             }
 
             if (currentBoilerState != BoilerState.OperationalState || currentBoilerState == BoilerState.Ready)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 return $"Changed {currentBoilerState} to Lockout state ";
             }
             return "";
@@ -95,15 +103,17 @@ namespace BoilerApplication
         {
             throw new InvalidOperationException();
         }
-        public string ToggleInterLockState()
+
+        public async Task<string> ToggleInterLockState()
         {
             InterLockState currentInterLockState = _boiler.ToggleInterLockState();
-
+            await _logger.AppendLog(DateTime.Now, "Inter Lock State change", $" Changed to : {BoilerState.Lockout}");
             BoilerState currentBoilerState = _boiler.GetBoilerState();
 
             if (currentBoilerState == BoilerState.Lockout && currentInterLockState == InterLockState.Close)
             {
                 _boiler.ChangeState(BoilerState.Ready);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ready}");
                 return "Staus changed to close and boiler is ready";
             }
 
@@ -111,6 +121,7 @@ namespace BoilerApplication
             if (currentBoilerState == BoilerState.Ready && currentInterLockState == InterLockState.Open)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 return "Changed InterLock state to open state and so Boiler state went into LockOut ";
             }
 
@@ -118,10 +129,12 @@ namespace BoilerApplication
             if (currentBoilerState == BoilerState.OperationalState && currentInterLockState == InterLockState.Open)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
+                await _logger.AppendLog(DateTime.Now, "State change", $"Changed to : {BoilerState.Lockout}");
+                return $"You opened the Inter Lock in the operation state hence its moving to the {BoilerState.Lockout}";
             }
 
-            // To Handle inbetween cases inginition and pre
-
+            // To Handle inbetween cases inginition and pre - purge
+            await _logger.AppendLog(DateTime.Now, "Inter Lock State change", $"Changed to : {currentInterLockState}");
             return $"Status Chnaged to {currentInterLockState}";
         }
 
@@ -142,7 +155,11 @@ namespace BoilerApplication
             {
                 return "";
             }
+        }
 
+        public async Task<string[]> LoadFromFile()
+        {
+            return await _logger.LoadFromFile();
         }
     }
 }

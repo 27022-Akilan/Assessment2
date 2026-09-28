@@ -18,7 +18,7 @@ namespace BoilerApplication
             _boilerService.ReflectTime += DisplayDashBoard;
         }
 
-        private void DisplayDashBoard(DateTime time, BoilerState state)
+        private void DisplayDashBoard(string timeLeft, BoilerState state)
         {
             CleanDashBoard();
             if (!Monitor.TryEnter(_UILock))
@@ -31,7 +31,7 @@ namespace BoilerApplication
                 Console.SetCursorPosition(0, 0);
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.BackgroundColor = ConsoleColor.Black;
-                Console.WriteLine($"State : {state} | Time left out  : {time}");
+                Console.WriteLine($"State : {state} | Time left out  : {timeLeft}");
                 Console.ResetColor();
                 Console.SetCursorPosition(left, right);
             }
@@ -72,16 +72,19 @@ namespace BoilerApplication
                             result = await _boilerService.Start();
                             break;
                         case MenuOptions.Stop:
-                            result = _boilerService.Stop();
+                            result = await _boilerService.Stop();
                             break;
                         case MenuOptions.ErrorSimulation:
                             _boilerService.ThrowError();
                             break;
                         case MenuOptions.Toggle:
-                            result = _boilerService.ToggleInterLockState();
+                            result = await _boilerService.ToggleInterLockState();
                             break;
                         case MenuOptions.Reset:
                             result = _boilerService.ResetBoiler();
+                            break;
+                        case MenuOptions.ViewLog:
+                            await DisplayLog();
                             break;
                         case MenuOptions.Exit:
                             isRunning = false;
@@ -106,6 +109,10 @@ namespace BoilerApplication
                     _boilerService.ResetBoiler();
                 }
 
+                catch (Exception e)
+                {
+                    DisplayMessage($"Unexpected Error : {e.Message}");
+                }
             }
         }
 
@@ -130,6 +137,19 @@ namespace BoilerApplication
         private static void DisplayMessage(string s)
         {
             Console.WriteLine(s);
+        }
+
+        private async Task DisplayLog()
+        {
+            string[] data = await _boilerService.LoadFromFile();
+
+            lock (_UILock)
+            {
+                for (int i = 0; i < data.Length; i++)
+                {
+                    Console.WriteLine(data[i]);
+                }
+            }
         }
     }
 }

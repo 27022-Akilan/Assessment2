@@ -1,22 +1,50 @@
-﻿
-namespace BoilerApplication.Repository
+﻿namespace BoilerApplication.Repository
 {
     public class Logger : ILogger
     {
+        private readonly SemaphoreSlim _fileLock = new SemaphoreSlim(1, 1);
         private readonly string _filePath;
+
         public Logger(string filePath)
         {
             _filePath = filePath;
         }
 
-        public void AppendLog(DateTime dateTime, string description, string message)
+        public async Task AppendLog(DateTime dateTime, string activity, string message)
         {
-            throw new NotImplementedException();
+            await _fileLock.WaitAsync();
+
+            try
+            {
+                if (!File.Exists(_filePath))
+                {
+                    using StreamWriter initialWriter = new StreamWriter(_filePath);
+                    initialWriter.WriteLine("TimeStamp", "Activity", "Log Message");
+                    return;
+                }
+
+                using StreamWriter writer = new StreamWriter(_filePath, append: true);
+                writer.WriteLine($"{dateTime},{activity},{message}");
+            }
+            finally
+            {
+                _fileLock.Release();
+            }
         }
 
-        public void LoadFromFile()
+        public async Task<string[]> LoadFromFile()
         {
-            throw new NotImplementedException();
+            if (!File.Exists(_filePath))
+            {
+                return new string[0];
+            }
+            await _fileLock.WaitAsync();
+            try
+            {
+                return await File.ReadAllLinesAsync(_filePath, default);
+            }
+
+            finally { _fileLock.Release(); }
         }
     }
 }

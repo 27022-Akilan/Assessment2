@@ -2,8 +2,8 @@
 {
     public interface ILogger
     {
-        void LoadFromFile();
+        Task<string[]> LoadFromFile();
 
-        void AppendLog(DateTime dateTime, string description, string message);
+        Task AppendLog(DateTime dateTime, string description, string message);
     }
 }

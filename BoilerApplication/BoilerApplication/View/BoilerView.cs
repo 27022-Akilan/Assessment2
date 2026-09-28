@@ -6,6 +6,9 @@ using BoilerApplication.Services;
 
 namespace BoilerApplication.View
 {
+    /// <summary>
+    /// Represents the UI for the Boiler .
+    /// </summary>
     public class BoilerView
     {
         private BoilerService _boilerService;
@@ -16,15 +19,22 @@ namespace BoilerApplication.View
 
         private static object _UILock = new object();
 
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BoilerView"/> class.
+        /// </summary>
+        /// <param name="boilerService">Boiler service</param>
+        /// <param name="boiler">Boiler info</param>
+        /// <param name="logger">Logger</param>
         public BoilerView(BoilerService boilerService, Boiler boiler, ILogger logger)
         {
             _boilerService = boilerService;
             _boiler = boiler;
             _logger = logger;
-            _boilerService.ReflectTime += DisplayDashBoard;
+            _boilerService.OnProcessing += DisplayDashBoard;
         }
 
-        public async Task RunApplication()
+        public async Task RunApplicationAsync()
         {
             bool isRunning = true;
             while (isRunning)
@@ -42,22 +52,22 @@ namespace BoilerApplication.View
                     switch (option)
                     {
                         case MenuOptions.Start:
-                            result = await _boilerService.Start();
+                            result = await _boilerService.StartAsync();
                             break;
                         case MenuOptions.Stop:
-                            result = await _boilerService.Stop();
+                            result = await _boilerService.StopAsync();
                             break;
                         case MenuOptions.ErrorSimulation:
                             _boilerService.ThrowError();
                             break;
                         case MenuOptions.Toggle:
-                            result = await _boilerService.ToggleInterLockState();
+                            result = await _boilerService.ToggleInterLockStateAsync();
                             break;
                         case MenuOptions.Reset:
                             result = _boilerService.ResetBoiler();
                             break;
                         case MenuOptions.ViewLog:
-                            await DisplayLog();
+                            await DisplayLogAsync();
                             break;
                         case MenuOptions.Exit:
                             isRunning = false;
@@ -68,6 +78,7 @@ namespace BoilerApplication.View
                             break;
                     }
 
+                    Console.Clear();
                     DisplayMessage($"\n{result}\n");
                     DisplayStateMessage($"After your operation" +
                          $"\nBoiler State: {_boiler.GetBoilerState()}" +
@@ -80,14 +91,14 @@ namespace BoilerApplication.View
                 {
                     DisplayMessage("Machine failed Resetting to the normal state !!");
                     _boilerService.ResetBoiler();
-                    await _logger.AppendLog(DateTime.Now, "[Error]", $"{ex}");
+                    await _logger.AppendLogAsync(DateTime.Now, "[Error]", $"{ex}");
                 }
 
                 catch (Exception ex)
                 {
                     DisplayMessage($"Unexpected Error : {ex.Message}");
                     _boilerService.ResetBoiler();
-                    await _logger.AppendLog(DateTime.Now, "[Error]", $"{ex}");
+                    await _logger.AppendLogAsync(DateTime.Now, "[Error]", $"{ex}");
                 }
             }
         }
@@ -104,9 +115,13 @@ namespace BoilerApplication.View
         }
 
 
+        /// <summary>
+        /// Displays the DashBoard.
+        /// </summary>
+        /// <param name="timeLeft">Time to be displayed.</param>
+        /// <param name="state">State of the boiler.</param>
         private void DisplayDashBoard(string timeLeft, BoilerState state)
         {
-            CleanDashBoard();
             if (!Monitor.TryEnter(_UILock))
             {
                 return;
@@ -127,24 +142,21 @@ namespace BoilerApplication.View
             }
         }
 
-        private void CleanDashBoard()
-        {
-            Console.WriteLine();
-        }
-        public static void DashBoardMessage(string message)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            DisplayMessage(message);
-            Console.ResetColor();
-        }
-
-        public static void DisplayStateMessage(string stateMessage)
+        /// <summary>
+        /// To display the State messages in the blue color.
+        /// </summary>
+        /// <param name="stateMessage">Sate info of the boiler.</param>
+        private static void DisplayStateMessage(string stateMessage)
         {
             Console.ForegroundColor = ConsoleColor.Blue;
             DisplayMessage(stateMessage);
             Console.ResetColor();
         }
 
+        /// <summary>
+        /// Displays the Message in default color.
+        /// </summary>
+        /// <param name="message">Message to be displayed.</param>
         private static void DisplayMessage(string message)
         {
             lock (_UILock)
@@ -153,9 +165,13 @@ namespace BoilerApplication.View
             }
         }
 
-        private async Task DisplayLog()
+        /// <summary>
+        /// Displays the Log to the user.
+        /// </summary>
+        /// <returns></returns>
+        private async Task DisplayLogAsync()
         {
-            string[] data = await _boilerService.LoadFromFile();
+            string[] data = await _boilerService.LoadFromFileAsync();
 
             lock (_UILock)
             {

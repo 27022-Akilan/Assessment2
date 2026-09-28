@@ -5,6 +5,9 @@ using BoilerApplication.Repository;
 
 namespace BoilerApplication.Services
 {
+    /// <summary>
+    /// Represents the services provided by the Boiler.
+    /// </summary>
     public class BoilerService
     {
         private Boiler _boiler;
@@ -18,8 +21,17 @@ namespace BoilerApplication.Services
             _boiler = boiler;
         }
 
-        public event Action<string, BoilerState> ReflectTime;
-        public async Task<string> Start()
+        /// <summary>
+        /// An event which is to be triggered on while the boiler is processing.
+        /// </summary>
+        public event Action<string, BoilerState> OnProcessing;
+
+        /// <summary>
+        /// Starts the Boiler .
+        /// Just started the processing and returned to the caller.
+        /// </summary>
+        /// <returns>Operation's result message</returns>
+        public async Task<string> StartAsync()
         {
             if (_boiler.GetInterLockState() == InterLockState.Open)
             {
@@ -31,57 +43,71 @@ namespace BoilerApplication.Services
                 _cts = new CancellationTokenSource();
 
                 // Knowingly didnt awaited here backend processing. 
-                _ = Task.Run(() => StartSequence(_cts.Token));
+                _ = Task.Run(() => StartSequenceAsync(_cts.Token));
                 return "Boiler stated its processing";
             }
 
             return "Boiler is already running";
         }
 
-        private async Task StartSequence(CancellationToken ct)
+        /// <summary>
+        /// Makes the boiler to progress through Pre-purge, ignition and operational stages.
+        /// </summary>
+        /// <param name="cancellationToken">Cancellation token which is used to cancel the processing.</param>
+        private async Task StartSequenceAsync(CancellationToken cancellationToken)
         {
             try
             {
                 _boiler.ChangeState(BoilerState.PrePurge);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.PrePurge}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.PrePurge}");
+
+                // Loop to invoke the event each second for 10 seconds while in pre-purge state.
                 for (int i = Constants.TimeForPrePurge; i >= 0; i--)
                 {
-                    ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
+                    OnProcessing?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
 
                     // delaying for 1 second so totaly it makes 10 seconds
-                    await Task.Delay(1000, ct);
+                    await Task.Delay(1000, cancellationToken);
                 }
 
                 _boiler.ChangeState(BoilerState.Ignition);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ignition}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ignition}");
 
+                // Loop to invoke the event each second for 10 seconds while in ignition state.
                 for (int i = Constants.TimeForIngnition; i >= 0; i--)
                 {
-                    ReflectTime?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
+                    OnProcessing?.Invoke($"Time Left :{i} s", _boiler.GetBoilerState());
 
                     // delaying for 1 second so totaly it makes 10 seconds
-                    await Task.Delay(1000, ct);
+                    await Task.Delay(1000, cancellationToken);
                 }
 
+                // Finally changing to operational state.
                 _boiler.ChangeState(BoilerState.OperationalState);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.OperationalState}");
+                OnProcessing?.Invoke("Completed", _boiler.GetBoilerState());
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.OperationalState}");
 
             }
 
+            // Catches the when the cacellation token is recieved then this exception is trown and handled gracefull exiting.
             catch (OperationCanceledException)
             {
                 _cts.Dispose();
                 _boiler.ChangeState(BoilerState.Lockout);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 if (_boiler.GetInterLockState() == InterLockState.Close)
                 {
                     _boiler.ToggleInterLockState();
-                    await _logger.AppendLog(DateTime.Now, "InterLock change", $"Boiler Interlock changed to : {_boiler.GetInterLockState}");
+                    await _logger.AppendLogAsync(DateTime.Now, "InterLock change", $"Boiler Interlock changed to : {_boiler.GetInterLockState}");
                 }
             }
         }
 
-        public async Task<string> Stop()
+        /// <summary>
+        /// Stops the Boiler.
+        /// </summary>
+        /// <returns>Operation's result message</returns>
+        public async Task<string> StopAsync()
         {
             BoilerState currentBoilerState = _boiler.GetBoilerState();
             if (currentBoilerState == BoilerState.Lockout)
@@ -94,36 +120,45 @@ namespace BoilerApplication.Services
             }
             if (currentBoilerState == BoilerState.PrePurge || currentBoilerState == BoilerState.Ignition)
             {
+                // To stop the processing.
                 _cts.Cancel();
                 _boiler.ChangeState(BoilerState.Lockout);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Stopped the boiler and state changed to : {BoilerState.Lockout}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Stopped the boiler and state changed to : {BoilerState.Lockout}");
                 return $"Stopped Boiler and changed {currentBoilerState} into lockout State";
             }
 
             if (currentBoilerState != BoilerState.OperationalState || currentBoilerState == BoilerState.Ready)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 return $"Changed {currentBoilerState} to Lockout state ";
             }
             return "";
         }
 
+        /// <summary>
+        /// Throws an exception .
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Invalid operation exception just for throwing an exception.</exception>
         public void ThrowError()
         {
             throw new InvalidOperationException();
         }
 
-        public async Task<string> ToggleInterLockState()
+        /// <summary>
+        /// Toggles the state of the boiler and changes the Boiler state according to the interlock state.
+        /// </summary>
+        /// <returns>Operation's result message</returns>
+        public async Task<string> ToggleInterLockStateAsync()
         {
             InterLockState currentInterLockState = _boiler.ToggleInterLockState();
-            await _logger.AppendLog(DateTime.Now, "Inter Lock State change", $" Changed to : {BoilerState.Lockout}");
+            await _logger.AppendLogAsync(DateTime.Now, "Inter Lock State change", $" Changed to : {BoilerState.Lockout}");
             BoilerState currentBoilerState = _boiler.GetBoilerState();
 
             if (currentBoilerState == BoilerState.Lockout && currentInterLockState == InterLockState.Close)
             {
                 _boiler.ChangeState(BoilerState.Ready);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ready}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Ready}");
                 return "Staus changed to close and boiler is ready";
             }
 
@@ -131,7 +166,7 @@ namespace BoilerApplication.Services
             if (currentBoilerState == BoilerState.Ready && currentInterLockState == InterLockState.Open)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Boiler state changed to : {BoilerState.Lockout}");
                 return "Changed InterLock state to open state and so Boiler state went into LockOut ";
             }
 
@@ -139,16 +174,21 @@ namespace BoilerApplication.Services
             if (currentBoilerState == BoilerState.OperationalState && currentInterLockState == InterLockState.Open)
             {
                 _boiler.ChangeState(BoilerState.Lockout);
-                await _logger.AppendLog(DateTime.Now, "State change", $"Changed to : {BoilerState.Lockout}");
+                await _logger.AppendLogAsync(DateTime.Now, "State change", $"Changed to : {BoilerState.Lockout}");
                 return $"You opened the Inter Lock in the operation state hence its moving to the {BoilerState.Lockout}";
             }
 
             // To Handle inbetween cases inginition and pre - purge
             ResetBoiler();
-            await _logger.AppendLog(DateTime.Now, "Inter Lock State change", $"Changed to : {currentInterLockState}");
+            await _logger.AppendLogAsync(DateTime.Now, "Inter Lock State change", $"Changed to : {currentInterLockState}");
             return $"Status Chnaged to {currentInterLockState}";
         }
 
+
+        /// <summary>
+        /// Resetting the boiler to the initial state (LockOut).
+        /// </summary>
+        /// <returns>Operation's result message</returns>
         public string ResetBoiler()
         {
             BoilerState currentBoilerState = _boiler.GetBoilerState();
@@ -162,15 +202,27 @@ namespace BoilerApplication.Services
                 _cts.Cancel();
                 return "Reseted Boiler Intial State";
             }
+
+            if (currentBoilerState == BoilerState.OperationalState)
+            {
+                _boiler.ChangeState(BoilerState.Lockout);
+                _logger.AppendLogAsync(DateTime.Now, "Change State", $"{BoilerState.Lockout}");
+                return $"Reseted the Boiler to {BoilerState.Lockout}";
+            }
+
             else
             {
-                return "";
+                return "You are already in the ready state \nCant be resetted.";
             }
         }
 
-        public async Task<string[]> LoadFromFile()
+        /// <summary>
+        /// Gets the log.
+        /// </summary>
+        /// <returns>Array of string representing the logs.</returns>
+        public async Task<string[]> LoadFromFileAsync()
         {
-            return await _logger.LoadFromFile();
+            return await _logger.LoadFromFileAsync();
         }
     }
 }

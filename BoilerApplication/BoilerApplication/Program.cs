@@ -25,14 +25,14 @@ namespace BoilerApplication
 
                 BoilerService service = new BoilerService(boiler, logger);
 
-                await logger.LoadFromFile();
+                await logger.LoadFromFileAsync();
                 service.ResetBoiler();
-                await logger.AppendLog(DateTime.Now, "Status change", "Reseted to LockOut State");
-                await logger.AppendLog(DateTime.Now, "Inter Lock Status Change", "Reseted to Open state");
+                await logger.AppendLogAsync(DateTime.Now, "Status change", "Reseted to LockOut State");
+                await logger.AppendLogAsync(DateTime.Now, "Inter Lock Status Change", "Reseted to Open state");
 
 
                 BoilerView view = new BoilerView(service, boiler, logger);
-                await view.RunApplication();
+                await view.RunApplicationAsync();
             }
 
             catch (UnauthorizedAccessException e)

@@ -2,15 +2,24 @@
 {
     public class Logger : ILogger
     {
+        /// <summary>
+        /// A lock to the file where a single thread can enter one at a time.
+        /// </summary>
         private readonly SemaphoreSlim _fileLock = new SemaphoreSlim(1, 1);
+
         private readonly string _filePath;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Logger"/> class.
+        /// </summary>
+        /// <param name="filePath"></param>
         public Logger(string filePath)
         {
             _filePath = filePath;
         }
 
-        public async Task AppendLog(DateTime timeStamp, string activity, string message)
+        /// <inheritdoc/>
+        public async Task AppendLogAsync(DateTime timeStamp, string activity, string message)
         {
             await _fileLock.WaitAsync();
 
@@ -19,12 +28,12 @@
                 if (!File.Exists(_filePath))
                 {
                     using StreamWriter initialWriter = new StreamWriter(_filePath);
-                    initialWriter.WriteLine("TimeStamp", "Event", "Event Data");
+                    await initialWriter.WriteLineAsync("TimeStamp,Event,Event Data");
                     return;
                 }
 
                 using StreamWriter writer = new StreamWriter(_filePath, append: true);
-                writer.WriteLine($"{timeStamp},{activity},{message}");
+                await writer.WriteLineAsync($"{timeStamp},{activity},{message}");
             }
             finally
             {
@@ -32,7 +41,8 @@
             }
         }
 
-        public async Task<string[]> LoadFromFile()
+        /// <inheritdoc/>
+        public async Task<string[]> LoadFromFileAsync()
         {
             if (!File.Exists(_filePath))
             {

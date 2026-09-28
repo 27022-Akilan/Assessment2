@@ -105,13 +105,15 @@ namespace BoilerApplication.View
 
         private void DisplayMenu()
         {
-            DisplayMessage("\n1.Start" +
+            DisplayMessage("=======================================" +
+                            "\n1.Start" +
                            "\n2.Stop" +
                            "\n3.SimulateError" +
                            "\n4.Toggle(open/close)" +
                            "\n5.Reset" +
                            "\n6.View Log" +
-                           "\n7.Exit");
+                           "\n7.Exit" +
+                           "\n=======================================");
         }
 
 
